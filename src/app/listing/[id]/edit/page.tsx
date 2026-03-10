@@ -1,17 +1,21 @@
 'use client';
-
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
-import { MapPin, DollarSign, AlignLeft, Send } from 'lucide-react';
+import { MapPin, DollarSign, AlignLeft, Send, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import ImageUpload from '@/components/ImageUpload';
+import SplashScreen from '@/components/SplashScreen';
+import Link from 'next/link';
 
-export default function CreateListing() {
-  const { user, token } = useAuth();
+const SERVER = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000';
+
+export default function EditListing() {
+  const { id } = useParams();
   const router = useRouter();
-  
+  const { token, user } = useAuth();
+
   const [formData, setFormData] = useState({
     title: '',
     location: '',
@@ -19,14 +23,37 @@ export default function CreateListing() {
     description: '',
     price: '',
   });
-  
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!user) {
+    if (!token) {
       router.push('/login');
+      return;
     }
-  }, [user, router]);
+    fetch(`${SERVER}/api/listings/${id}`)
+      .then((res) => {
+        if (!res.ok) throw new Error('Not found');
+        return res.json();
+      })
+      .then((data) => {
+        // Ownership guard
+        if (!user || data.author._id !== user._id) {
+          toast.error('Not authorised', { description: "You don't own this listing." });
+          router.push('/');
+          return;
+        }
+        setFormData({
+          title: data.title,
+          location: data.location,
+          imageUrl: data.imageUrl,
+          description: data.description,
+          price: data.price?.toString() ?? '',
+        });
+        setLoading(false);
+      })
+      .catch(() => router.push('/'));
+  }, [id, token, user, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -34,57 +61,63 @@ export default function CreateListing() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
-
     if (!formData.imageUrl) {
-      toast.error('Image required', { description: 'Please upload an image for your experience.' });
+      toast.error('Image required', { description: 'Please upload an image.' });
       return;
     }
-    
-    setLoading(true);
-
+    setSaving(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/listings`, {
-        method: 'POST',
-        headers: { 
+      const res = await fetch(`${SERVER}/api/listings/${id}`, {
+        method: 'PUT',
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           ...formData,
-          price: formData.price ? Number(formData.price) : undefined
+          price: formData.price ? Number(formData.price) : undefined,
         }),
       });
-
       const data = await res.json();
-
       if (res.ok) {
-        toast.success('Experience published!', { description: 'Your listing is now live for everyone to discover.' });
-        router.push('/');
+        toast.success('Updated!', { description: 'Your experience has been saved.' });
+        router.push(`/listing/${id}`);
       } else {
-        toast.error('Failed to publish', { description: data.message || 'Could not create the listing.' });
+        toast.error('Failed to save', { description: data.message });
       }
-    } catch (err) {
-      toast.error('Something went wrong', { description: 'An error occurred. Please try again.' });
+    } catch {
+      toast.error('Something went wrong');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  if (!user) return null;
+  if (loading) return <SplashScreen />;
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <Link
+        href={`/listing/${id}`}
+        className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-primary transition-colors mb-6 group"
+      >
+        <ArrowLeft className="w-4 h-4 mr-1 group-hover:-translate-x-1 transition-transform" />
+        Back to listing
+      </Link>
+
       <div className="glass dark:glass-dark rounded-3xl p-8 md:p-12 animate-fade-in-up border border-slate-200/60 dark:border-slate-700/60 shadow-2xl">
         <div className="mb-10 text-center">
-          <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-3 tracking-tight">Post an Experience</h1>
-          <p className="text-slate-500 dark:text-slate-400">Share your incredible journey or local expertise with the world.</p>
+          <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-3 tracking-tight">
+            Edit Experience
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400">Update the details of your listing.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="col-span-1 md:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Experience Title</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Experience Title
+              </label>
               <input
                 type="text"
                 name="title"
@@ -92,10 +125,9 @@ export default function CreateListing() {
                 value={formData.title}
                 onChange={handleChange}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition"
-                placeholder="e.g. Sunset Boat Tour in Bali"
               />
             </div>
-            
+
             <div>
               <label className="flex items-center text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 <MapPin className="w-4 h-4 mr-1 text-slate-400" /> Location
@@ -107,7 +139,6 @@ export default function CreateListing() {
                 value={formData.location}
                 onChange={handleChange}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition"
-                placeholder="e.g. Bali, Indonesia"
               />
             </div>
 
@@ -121,17 +152,18 @@ export default function CreateListing() {
                 value={formData.price}
                 onChange={handleChange}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition"
-                placeholder="0.00 (Optional)"
                 min="0"
                 step="0.01"
               />
             </div>
 
             <div className="col-span-1 md:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Experience Image</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Experience Image
+              </label>
               <ImageUpload
                 value={formData.imageUrl}
-                onChange={(base64) => setFormData(prev => ({ ...prev, imageUrl: base64 }))}
+                onChange={(base64) => setFormData((prev) => ({ ...prev, imageUrl: base64 }))}
               />
             </div>
 
@@ -146,21 +178,19 @@ export default function CreateListing() {
                 onChange={handleChange}
                 rows={5}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition resize-none"
-                placeholder="Describe what makes this experience special..."
-              ></textarea>
+              />
             </div>
           </div>
 
           <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-right">
             <Button
               type="submit"
-              disabled={loading}
-              className="inline-flex items-center px-8 py-6 rounded-xl hover:bg-blue-600 text-base"
+              disabled={saving}
+              className="inline-flex items-center px-8 py-6 rounded-xl text-base"
             >
-              {loading ? 'Publishing...' : (
+              {saving ? 'Saving…' : (
                 <>
-                  <Send className="w-4 h-4 mr-2" />
-                  Publish Experience
+                  <Send className="w-4 h-4 mr-2" /> Save Changes
                 </>
               )}
             </Button>
