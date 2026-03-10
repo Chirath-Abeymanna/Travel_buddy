@@ -1,22 +1,24 @@
-'use client';
-import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useAuth } from '@/lib/AuthContext';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
+"use client";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/lib/AuthContext";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
-export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+function LoginForm() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    if (searchParams.get('registered') === 'true') {
-      toast.success('Account created!', { description: 'You can now log in with your new account.' });
+    if (searchParams.get("registered") === "true") {
+      toast.success("Account created!", {
+        description: "You can now log in with your new account.",
+      });
     }
   }, [searchParams]);
 
@@ -25,11 +27,11 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': process.env.NEXT_PUBLIC_API_KEY || ''
+      const res = await fetch("http://localhost:5000/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: process.env.NEXT_PUBLIC_API_KEY || "",
         },
         body: JSON.stringify({ email, password }),
       });
@@ -37,13 +39,19 @@ export default function Login() {
 
       if (res.ok) {
         login(data.token, data.user);
-        toast.success('Welcome back!', { description: `Logged in as ${data.user.firstName} ${data.user.lastName}` });
-        router.push('/');
+        toast.success("Welcome back!", {
+          description: `Logged in as ${data.user.firstName} ${data.user.lastName}`,
+        });
+        router.push("/");
       } else {
-        toast.error('Login failed', { description: data.message || 'Invalid credentials.' });
+        toast.error("Login failed", {
+          description: data.message || "Invalid credentials.",
+        });
       }
     } catch (err) {
-      toast.error('Something went wrong', { description: 'An error occurred. Please try again.' });
+      toast.error("Something went wrong", {
+        description: "An error occurred. Please try again.",
+      });
     } finally {
       setLoading(false);
     }
@@ -53,13 +61,19 @@ export default function Login() {
     <div className="min-h-[80vh] flex items-center justify-center p-4">
       <div className="w-full max-w-md glass dark:glass-dark rounded-3xl p-8 animate-fade-in-up">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Welcome Back</h1>
-          <p className="text-slate-500 dark:text-slate-400">Log in to discover experiences</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+            Welcome Back
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400">
+            Log in to discover experiences
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Email</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              Email
+            </label>
             <input
               type="email"
               required
@@ -70,7 +84,9 @@ export default function Login() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Password</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              Password
+            </label>
             <input
               type="password"
               required
@@ -85,17 +101,36 @@ export default function Login() {
             disabled={loading}
             className="w-full py-6 rounded-xl shadow-lg shadow-orange-500/25 text-base"
           >
-            {loading ? 'Logging in...' : 'Log In'}
+            {loading ? "Logging in..." : "Log In"}
           </Button>
         </form>
 
         <p className="mt-8 text-center text-slate-500 dark:text-slate-400 text-sm">
-          Don't have an account?{' '}
-          <Link href="/register" className="text-primary dark:text-primary font-semibold hover:underline">
+          Don't have an account?{" "}
+          <Link
+            href="/register"
+            className="text-primary dark:text-primary font-semibold hover:underline"
+          >
             Sign up
           </Link>
         </p>
       </div>
     </div>
+  );
+}
+
+export default function Login() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[80vh] flex items-center justify-center">
+          <div className="animate-pulse text-slate-500 dark:text-slate-400">
+            Loading...
+          </div>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }
