@@ -154,77 +154,79 @@ function ListingCard({
 }
 
 export default function Home() {
-  const [publicListings, setPublicListings] = useState<Listing[]>([]);
-  const [myListings, setMyListings] = useState<Listing[]>([]);
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [totalPages, setTotalPages] = useState(1);
   const [tab, setTab] = useState<'public' | 'my'>('public');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [myLoading, setMyLoading] = useState(false);
+  const [fetching, setFetching] = useState(false);
   const { token, user, isRestored } = useAuth();
 
-  // Reset page when tab or search changes
-  useEffect(() => { setPage(1); }, [tab, search]);
+  // Debounce search input (400ms)
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  // Fetch public listings — no auth required
+  // Reset page when tab or search changes
+  useEffect(() => { setPage(1); }, [tab, debouncedSearch]);
+
+  // Fetch listings whenever page, tab, debounced search, or auth changes
   useEffect(() => {
     if (!isRestored) return;
-    const fetchPublic = async () => {
+    if (tab === 'my' && !token) return;
+
+    const doFetch = async () => {
+      // Only show full splash on very first load
+      if (loading) {
+        // already showing splash
+      } else {
+        setFetching(true);
+      }
+
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: '9',
+        ...(debouncedSearch ? { search: debouncedSearch } : {}),
+      });
+
+      const url =
+        tab === 'public'
+          ? `${SERVER}/api/listings?${params}`
+          : `${SERVER}/api/listings/my?${params}`;
+
+      const headers: Record<string, string> =
+        tab === 'my' ? { Authorization: `Bearer ${token}` } : {};
+
       try {
-        const res = await fetch(`${SERVER}/api/listings`);
-        if (res.ok) setPublicListings(await res.json());
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          setListings(data.listings);
+          setTotalPages(data.totalPages);
+        }
       } catch (err) {
-        console.error('Failed to fetch public listings:', err);
+        console.error('Fetch error:', err);
       } finally {
         setLoading(false);
+        setFetching(false);
       }
     };
-    fetchPublic();
-  }, [isRestored]);
 
-  // Fetch My Feed when tab switches or user logs in
-  useEffect(() => {
-    if (tab !== 'my' || !token) return;
-    const fetchMy = async () => {
-      setMyLoading(true);
-      try {
-        const res = await fetch(`${SERVER}/api/listings/my`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) setMyListings(await res.json());
-      } catch (err) {
-        console.error('Failed to fetch my listings:', err);
-      } finally {
-        setMyLoading(false);
-      }
-    };
-    fetchMy();
-  }, [tab, token]);
+    doFetch();
+  }, [isRestored, tab, page, debouncedSearch, token]);
 
   const handleDeleted = (id: string) => {
-    setMyListings((prev) => prev.filter((l) => l._id !== id));
-    setPublicListings((prev) => prev.filter((l) => l._id !== id));
-    setPage(1); // reset to first page after delete
+    // After delete, refetch current page (may have fewer than 9)
+    setPage((p) => p); // no-op triggers the useEffect via functional update trick
+    setListings((prev) => prev.filter((l) => l._id !== id));
   };
 
   if (loading) return <SplashScreen />;
 
-  const activeListings = tab === 'public' ? publicListings : myListings;
   const showActions = tab === 'my';
-
-  const filtered = search.trim()
-    ? activeListings.filter((l) => {
-        const q = search.toLowerCase();
-        return (
-          l.title.toLowerCase().includes(q) ||
-          l.location.toLowerCase().includes(q) ||
-          l.description.toLowerCase().includes(q)
-        );
-      })
-    : activeListings;
-
-  const totalPages = Math.ceil(filtered.length / CARDS_PER_PAGE);
-  const paginated = filtered.slice((page - 1) * CARDS_PER_PAGE, page * CARDS_PER_PAGE);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -288,13 +290,20 @@ export default function Home() {
         )}
       </div>
 
-      {/* My Feed loading state */}
-      {myLoading ? (
-        <SplashScreen />
-      ) : paginated.length > 0 ? (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {paginated.map((listing) => (
+      {/* Listings grid & state */}
+      <div className={`relative transition-all duration-300 ${fetching ? 'opacity-50 pointer-events-none' : ''}`}>
+        
+        {/* Inline spinner overlay when fetching but we already have cards */}
+        {fetching && listings.length > 0 && (
+          <div className="absolute top-10 left-1/2 -translate-x-1/2 z-10 flex items-center justify-center p-3 rounded-full bg-white dark:bg-slate-800 shadow-xl border border-slate-100 dark:border-slate-700 animate-bounce">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+          </div>
+        )}
+
+        {listings.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {listings.map((listing: Listing) => (
               <ListingCard
                 key={listing._id}
                 listing={listing}
@@ -340,7 +349,7 @@ export default function Home() {
             </div>
           )}
         </>
-      ) : (
+      ) : !fetching ? (
         <div className="text-center py-16 animate-fade-in-up">
           <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-full w-20 h-20 mx-auto flex items-center justify-center mb-4">
             <MapPin className="w-10 h-10 text-slate-400" />
@@ -359,7 +368,14 @@ export default function Home() {
             </Link>
           )}
         </div>
+      ) : (
+        <div className="flex justify-center py-20">
+          <div className="p-3 rounded-full bg-white dark:bg-slate-800 shadow-xl border border-slate-100 dark:border-slate-700 animate-bounce">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        </div>
       )}
+      </div>
     </div>
   );
 }

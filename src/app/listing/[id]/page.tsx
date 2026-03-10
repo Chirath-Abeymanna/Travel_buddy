@@ -118,6 +118,7 @@ export default function ListingDetail() {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent" />
           <div className="absolute bottom-0 left-0 w-full p-8 md:p-12">
+            <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight mb-2">{listing.title}</h1>
             <div className="flex flex-wrap items-center gap-3 mb-4">
               <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md text-white text-sm font-semibold border border-white/20">
                 <MapPin className="w-4 h-4 mr-1.5" /> {listing.location}
@@ -126,7 +127,6 @@ export default function ListingDetail() {
                 <DollarSign className="w-4 h-4" /> {listing.price ?? 'Free'}
               </span>
             </div>
-            <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight mb-2">{listing.title}</h1>
           </div>
         </div>
 
