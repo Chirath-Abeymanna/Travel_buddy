@@ -1,18 +1,18 @@
-import type { Metadata } from 'next';
-import { Inter, Geist } from 'next/font/google';
-import './globals.css';
-import { AuthProvider } from '@/lib/AuthContext';
-import Navbar from '@/components/Navbar';
+import type { Metadata } from "next";
+import { Inter, Geist } from "next/font/google";
+import "./globals.css";
+import { AuthProvider } from "@/lib/AuthContext";
+import Navbar from "@/components/Navbar";
 import { cn } from "@/lib/utils";
-import { Toaster } from '@/components/ui/sonner';
+import { Toaster } from "@/components/ui/sonner";
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'WanderLuxe - Travel Experiences',
-  description: 'Discover and share amazing local travel experiences globally.',
+  title: "Travel Buddy",
+  description: "Discover and share amazing local travel experiences globally.",
 };
 
 export default function RootLayout({
@@ -25,9 +25,7 @@ export default function RootLayout({
       <body className={`${inter.className} min-h-screen flex flex-col`}>
         <AuthProvider>
           <Navbar />
-          <main className="flex-grow pt-20">
-            {children}
-          </main>
+          <main className="flex-grow pt-20">{children}</main>
           <Toaster richColors position="top-right" />
         </AuthProvider>
       </body>
